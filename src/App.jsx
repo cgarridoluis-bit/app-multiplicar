@@ -300,9 +300,19 @@ export default function MultiplicaGalaxiaPrototipo() {
     }, 700);
   };
 
+  const playSound = (type) => {
+    const audio = new Audio(`/sounds/${type}.mp3`);
+    audio.play();
+  };
+
   const answer = (value) => {
     if (feedback) return;
     const isCorrect = value === currentQuestion.correct;
+    if (isCorrect) {
+      playSound("correct");
+    } else {
+      playSound("wrong");
+    }
     const newScore = isCorrect ? score + 1 : score;
     setScore(newScore);
     setStars((prev) => prev + (isCorrect ? 1 : 0));
