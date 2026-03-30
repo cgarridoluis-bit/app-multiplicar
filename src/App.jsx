@@ -17,6 +17,8 @@ const CARD_REWARDS = [
   { id: 10, name: "Guardián de la Galaxia", icon: "✨", color: "#38bdf8" }
 ];
 
+<h2>Modo entrenamiento activado 🚀</h2>
+
 function shuffle(array) {
   const copy = [...array];
   for (let i = copy.length - 1; i > 0; i--) {
