@@ -17,7 +17,6 @@ const CARD_REWARDS = [
   { id: 10, name: "Guardián de la Galaxia", icon: "✨", color: "#38bdf8" }
 ];
 
-<h2>Modo entrenamiento activado 🚀</h2>
 
 function shuffle(array) {
   const copy = [...array];
@@ -251,6 +250,7 @@ export default function MultiplicaGalaxiaPrototipo() {
   const [questions, setQuestions] = useState(() => buildGame([2, 5, 10]));
   const [currentIndex, setCurrentIndex] = useState(0);
   const [score, setScore] = useState(0);
+  const [mistakes, setMistakes] = useState(0);
   const [stars, setStars] = useState(0);
   const [feedback, setFeedback] = useState(null);
   const [showSupport, setShowSupport] = useState(false);
@@ -264,6 +264,7 @@ export default function MultiplicaGalaxiaPrototipo() {
     setQuestions(newQuestions);
     setCurrentIndex(0);
     setScore(0);
+    setMistakes(0);
     setStars(0);
     setFeedback(null);
     setShowSupport(false);
@@ -314,6 +315,7 @@ export default function MultiplicaGalaxiaPrototipo() {
       playSound("correct");
     } else {
       playSound("wrong");
+      setMistakes((prev) => prev + 1);
     }
     const newScore = isCorrect ? score + 1 : score;
     setScore(newScore);
@@ -491,6 +493,7 @@ export default function MultiplicaGalaxiaPrototipo() {
               <h3 style={{ marginTop: 0, color: "#312e81" }}>Panel de mando</h3>
               <div style={{ display: "grid", gap: 10 }}>
                 <div style={{ background: "#eff6ff", borderRadius: 16, padding: 12, display: "flex", justifyContent: "space-between" }}><span>Aciertos</span><strong>{score}</strong></div>
+                <div style={{ background: "#fee2e2", borderRadius: 16, padding: 12, display: "flex", justifyContent: "space-between" }}><span>Fallos</span><strong>{mistakes}</strong></div>
                 <div style={{ background: "#fff7ed", borderRadius: 16, padding: 12, display: "flex", justifyContent: "space-between" }}><span>Estrellas</span><strong>{stars}</strong></div>
                 <div style={{ background: "#f5f3ff", borderRadius: 16, padding: 12, display: "flex", justifyContent: "space-between" }}><span>Sectores</span><strong>{selectedTables.join(", ")}</strong></div>
               </div>
