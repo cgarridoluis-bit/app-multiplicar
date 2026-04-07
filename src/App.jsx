@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 
 const TABLE_OPTIONS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
@@ -17,7 +17,25 @@ const CARD_REWARDS = [
   { id: 10, name: "Guardián de la Galaxia", icon: "✨", color: "#38bdf8" }
 ];
 
-<h2>Modo entrenamiento activado 🚀</h2>
+const STORAGE_KEYS = {
+  collection: "multiplica-galaxia-collection",
+  selectedTables: "multiplica-galaxia-selectedTables",
+  stars: "multiplica-galaxia-stars"
+};
+
+function readStorage(key, fallback, isValid) {
+  if (typeof window === "undefined") return fallback;
+
+  try {
+    const stored = window.localStorage.getItem(key);
+    if (stored == null) return fallback;
+
+    const parsed = JSON.parse(stored);
+    return isValid(parsed) ? parsed : fallback;
+  } catch {
+    return fallback;
+  }
+}
 
 function shuffle(array) {
   const copy = [...array];
@@ -247,23 +265,50 @@ function ChoiceButton({ value, onClick }) {
 
 export default function MultiplicaGalaxiaPrototipo() {
   const [screen, setScreen] = useState("home");
-  const [selectedTables, setSelectedTables] = useState([2, 5, 10]);
+  const [selectedTables, setSelectedTables] = useState(() =>
+    readStorage(
+      STORAGE_KEYS.selectedTables,
+      [2, 5, 10],
+      (value) =>
+        Array.isArray(value) &&
+        value.length > 0 &&
+        value.every((item) => TABLE_OPTIONS.includes(item))
+    )
+  );
   const [questions, setQuestions] = useState(() => buildGame([2, 5, 10]));
   const [currentIndex, setCurrentIndex] = useState(0);
   const [score, setScore] = useState(0);
-  const [stars, setStars] = useState(0);
+  const [mistakes, setMistakes] = useState(0);
+  const [stars, setStars] = useState(() =>
+    readStorage(STORAGE_KEYS.stars, 0, Number.isInteger)
+  );
   const [feedback, setFeedback] = useState(null);
   const [showSupport, setShowSupport] = useState(false);
-  const [collection, setCollection] = useState([]);
+  const [collection, setCollection] = useState(() =>
+    readStorage(STORAGE_KEYS.collection, [], Array.isArray)
+  );
 
   const currentQuestion = questions[currentIndex];
   const progress = useMemo(() => (currentIndex / QUESTIONS_PER_GAME) * 100, [currentIndex]);
+
+  useEffect(() => {
+    window.localStorage.setItem(STORAGE_KEYS.selectedTables, JSON.stringify(selectedTables));
+  }, [selectedTables]);
+
+  useEffect(() => {
+    window.localStorage.setItem(STORAGE_KEYS.stars, JSON.stringify(stars));
+  }, [stars]);
+
+  useEffect(() => {
+    window.localStorage.setItem(STORAGE_KEYS.collection, JSON.stringify(collection));
+  }, [collection]);
 
   const startGame = () => {
     const newQuestions = buildGame(selectedTables);
     setQuestions(newQuestions);
     setCurrentIndex(0);
     setScore(0);
+    setMistakes(0);
     setStars(0);
     setFeedback(null);
     setShowSupport(false);
@@ -280,7 +325,7 @@ export default function MultiplicaGalaxiaPrototipo() {
     });
   };
 
-  const moveNext = (updatedScore) => {
+  const moveNext = (updatedScore, isCorrect) => {
     const nextIndex = currentIndex + 1;
     if (nextIndex >= QUESTIONS_PER_GAME) {
       const earnedCards = Math.floor(updatedScore / 5);
@@ -295,11 +340,13 @@ export default function MultiplicaGalaxiaPrototipo() {
       return;
     }
 
+    const feedbackDelay = isCorrect ? 1100 : 1700;
+
     setTimeout(() => {
       setCurrentIndex(nextIndex);
       setFeedback(null);
       setShowSupport(false);
-    }, 700);
+    }, feedbackDelay);
   };
 
   const playSound = (type) => {
@@ -314,13 +361,28 @@ export default function MultiplicaGalaxiaPrototipo() {
       playSound("correct");
     } else {
       playSound("wrong");
+      setMistakes((prev) => prev + 1);
     }
     const newScore = isCorrect ? score + 1 : score;
     setScore(newScore);
     setStars((prev) => prev + (isCorrect ? 1 : 0));
-    setFeedback(isCorrect ? { type: "correct", text: "¡Muy bien, comandante!" } : { type: "wrong", text: "Buen intento" });
+    const feedbackData = isCorrect
+      ? {
+          type: "correct",
+          badge: "⭐",
+          title: "¡Muy bien, comandante!",
+          text: "Respuesta correcta. Has ganado una estrella."
+        }
+      : {
+          type: "wrong",
+          badge: "💛",
+          title: "Buen intento",
+          text: `La respuesta correcta es ${currentQuestion.correct}.`,
+          detail: `${currentQuestion.a} × ${currentQuestion.b} = ${currentQuestion.correct}`
+        };
+    setFeedback(feedbackData);
     setShowSupport(!isCorrect);
-    moveNext(newScore);
+    moveNext(newScore, isCorrect);
   };
 
   return (
@@ -425,11 +487,53 @@ export default function MultiplicaGalaxiaPrototipo() {
         <div style={{ marginTop: 22, display: "grid", gridTemplateColumns: "2fr 1fr", gap: 18 }}>
           <div style={{ background: "white", borderRadius: 24, padding: 22, boxShadow: "0 10px 25px rgba(30,41,59,0.08)" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
-              <h2 style={{ margin: 0, color: "#312e81" }}>Misión {currentIndex + 1} de {QUESTIONS_PER_GAME}</h2>
+              <h2 style={{ margin: 0, color: "#312e81" }}>Pregunta {currentIndex + 1} de {QUESTIONS_PER_GAME}</h2>
               <div style={{ width: 180, height: 14, background: "#e2e8f0", borderRadius: 999, overflow: "hidden" }}>
                 <div style={{ width: `${progress}%`, height: "100%", background: "linear-gradient(90deg, #22c55e 0%, #3b82f6 100%)" }} />
               </div>
             </div>
+
+            <div style={{ marginTop: 18, display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 12 }}>
+              <div style={{ background: "#eff6ff", borderRadius: 18, padding: 14 }}>
+                <div style={{ fontSize: 12, fontWeight: 700, color: "#475569", textTransform: "uppercase", letterSpacing: 0.6 }}>Pregunta</div>
+                <div style={{ marginTop: 6, fontSize: 28, fontWeight: 800, color: "#1d4ed8" }}>{currentIndex + 1} / {QUESTIONS_PER_GAME}</div>
+              </div>
+              <div style={{ background: "#dcfce7", borderRadius: 18, padding: 14 }}>
+                <div style={{ fontSize: 12, fontWeight: 700, color: "#475569", textTransform: "uppercase", letterSpacing: 0.6 }}>Aciertos</div>
+                <div style={{ marginTop: 6, fontSize: 28, fontWeight: 800, color: "#166534" }}>{score}</div>
+              </div>
+              <div style={{ background: "#fee2e2", borderRadius: 18, padding: 14 }}>
+                <div style={{ fontSize: 12, fontWeight: 700, color: "#475569", textTransform: "uppercase", letterSpacing: 0.6 }}>Fallos</div>
+                <div style={{ marginTop: 6, fontSize: 28, fontWeight: 800, color: "#b91c1c" }}>{mistakes}</div>
+              </div>
+            </div>
+
+            {feedback && (
+              <motion.div
+                initial={{ opacity: 0, y: 10, scale: 0.96 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                transition={{ duration: 0.22, ease: "easeOut" }}
+                style={{
+                  marginTop: 18,
+                  borderRadius: 22,
+                  padding: 16,
+                  textAlign: "center",
+                  background: feedback.type === "correct" ? "linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%)" : "linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)",
+                  color: feedback.type === "correct" ? "#166534" : "#92400e",
+                  border: feedback.type === "correct" ? "2px solid #86efac" : "2px solid #fcd34d",
+                  boxShadow: "0 8px 18px rgba(30,41,59,0.08)"
+                }}
+              >
+                <div style={{ fontSize: 30, lineHeight: 1 }}>{feedback.badge}</div>
+                <div style={{ marginTop: 8, fontSize: 22, fontWeight: 800 }}>{feedback.title || feedback.text}</div>
+                <div style={{ marginTop: 6, fontSize: 16, fontWeight: 700 }}>{feedback.text}</div>
+                {feedback.detail && (
+                  <div style={{ marginTop: 10, fontSize: 20, fontWeight: 800, color: "#78350f" }}>
+                    {feedback.detail}
+                  </div>
+                )}
+              </motion.div>
+            )}
 
             <div style={{ marginTop: 18 }}>
               <MissionIllustration a={currentQuestion.a} b={currentQuestion.b} />
@@ -454,21 +558,6 @@ export default function MultiplicaGalaxiaPrototipo() {
                   ))}
                 </div>
 
-                {feedback && (
-                  <div
-                    style={{
-                      marginTop: 18,
-                      borderRadius: 18,
-                      padding: 14,
-                      textAlign: "center",
-                      fontWeight: 700,
-                      background: feedback.type === "correct" ? "#dcfce7" : "#fef3c7",
-                      color: feedback.type === "correct" ? "#166534" : "#92400e"
-                    }}
-                  >
-                    {feedback.text}
-                  </div>
-                )}
               </motion.div>
             </AnimatePresence>
           </div>
@@ -491,6 +580,7 @@ export default function MultiplicaGalaxiaPrototipo() {
               <h3 style={{ marginTop: 0, color: "#312e81" }}>Panel de mando</h3>
               <div style={{ display: "grid", gap: 10 }}>
                 <div style={{ background: "#eff6ff", borderRadius: 16, padding: 12, display: "flex", justifyContent: "space-between" }}><span>Aciertos</span><strong>{score}</strong></div>
+                <div style={{ background: "#fee2e2", borderRadius: 16, padding: 12, display: "flex", justifyContent: "space-between" }}><span>Fallos</span><strong>{mistakes}</strong></div>
                 <div style={{ background: "#fff7ed", borderRadius: 16, padding: 12, display: "flex", justifyContent: "space-between" }}><span>Estrellas</span><strong>{stars}</strong></div>
                 <div style={{ background: "#f5f3ff", borderRadius: 16, padding: 12, display: "flex", justifyContent: "space-between" }}><span>Sectores</span><strong>{selectedTables.join(", ")}</strong></div>
               </div>
